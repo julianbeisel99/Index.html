@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Memory: Klima im Wandel</title>
+<style>
+:root{--bg:#eef3f5;--ink:#1f2d33;--bar:#fff;--beg:#e3f0fb;--def:#fdf1dc;
+box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#141c20;--ink:#eaf1f4;--bar:#222d33;--beg:#27465c;--def:#5a4a2c}}
+html,body{margin:0}
+body{background:linear-gradient(180deg,rgba(230,120,60,.14),transparent 260px),var(--bg);color:var(--ink);font-family:"Segoe UI",system-ui,sans-serif;text-align:center;padding:12px}
+h1{font-size:1.5rem;margin:6px 0 2px}
+.sub{opacity:.75;margin:0 0 6px;font-size:.95rem}
+.info{display:flex;gap:10px;justify-content:center;margin:8px 0;flex-wrap:wrap}
+.info div{background:var(--bar);border-radius:10px;padding:6px 14px;box-shadow:0 1px 4px rgba(0,0,0,.15)}
+.tm1{border-left:10px solid #1f78d1}.tm2{border-left:10px solid #e07b18}
+.info .active{outline:3px solid var(--ink);font-weight:700}
+#turn{font-size:1.1rem;font-weight:700;margin-bottom:8px;min-height:1.4em}
+.grid{display:grid;grid-template-columns:repeat(8,1fr);gap:10px;max-width:1500px;margin:0 auto}
+@media (max-width:1250px){.grid{grid-template-columns:repeat(4,1fr)}}
+@media (max-width:640px){.grid{grid-template-columns:repeat(2,1fr);gap:8px}}
+.card{position:relative;aspect-ratio:1/1.05;cursor:pointer;perspective:800px}
+@media (max-width:1250px){.card{aspect-ratio:4/3}}
+.face{position:absolute;inset:0;border-radius:12px;backface-visibility:hidden;transition:transform .5s;box-sizing:border-box;box-shadow:0 4px 10px rgba(0,0,0,.28)}
+.back{background:radial-gradient(circle at 50% 38%,rgba(255,200,90,.95) 0 9%,rgba(255,150,60,.25) 10% 22%,transparent 23%),repeating-radial-gradient(circle at 50% 120%,rgba(255,255,255,.12) 0 6px,transparent 6px 14px),linear-gradient(170deg,#1b5e8c,#0b2f4f 70%,#0c3b3b);border:3px solid #fff;display:flex;align-items:flex-end;justify-content:center;padding-bottom:10px;font-size:1.6rem;color:#fff}
+.front{transform:rotateY(180deg);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;padding:8px;border:3px solid #fff}
+.front.begriff{background:linear-gradient(160deg,var(--beg),#cfe5f7)}
+.front.def{background:linear-gradient(160deg,var(--def),#f9e2b8)}
+.card.flipped .back,.card.matched .back{transform:rotateY(-180deg)}
+.card.flipped .front,.card.matched .front{transform:rotateY(0)}
+.card.t1 .front{background:#bfe0ff!important;border-color:#1f78d1}
+.card.t2 .front{background:#ffd3b0!important;border-color:#e07b18}
+.card.matched{animation:pop .4s}
+@keyframes pop{50%{transform:scale(1.06)}}
+.tag{font-size:.58rem;text-transform:uppercase;letter-spacing:.08em;color:#444;background:rgba(255,255,255,.75);border-radius:8px;padding:1px 8px}
+.txt{color:#1d1d1d;line-height:1.22;overflow-wrap:anywhere;hyphens:auto}
+.begriff .txt{font-weight:700;font-size:clamp(.95rem,1.7vw,1.3rem)}
+.def .txt{font-size:clamp(.72rem,1.15vw,.92rem)}
+@media (max-width:1250px){.begriff .txt{font-size:clamp(1rem,2.8vw,1.4rem)}.def .txt{font-size:clamp(.78rem,1.9vw,1rem)}}
+.overlay{position:fixed;inset:0;background:rgba(0,0,0,.82);color:#fff;display:none;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:20px;font-size:2.2rem;font-weight:700;z-index:10;cursor:pointer}
+.overlay.visible{display:flex}
+.overlay small{font-size:1.05rem;font-weight:400;margin-top:12px}
+</style>
+</head>
+<body>
+<h1>🌡️ Memory: Klima im Wandel</h1>
+<p class="sub">Ordne jedem Begriff die passende Definition zu.</p>
+<div id="start" class="overlay visible">Zum Starten klicken<small>Finde Begriff und Definition, die zusammengehören!</small></div>
+<div id="over" class="overlay">ZEIT ABGELAUFEN !<small id="overInfo"></small></div>
+<div id="win" class="overlay">GEWONNEN !<small id="winInfo"></small></div>
+<div class="info"><div>Zeit übrig: <span id="time">480</span></div><div>Züge: <span id="flips">0</span></div><div id="tm1" class="tm1">Team 1 (blau): <span id="s1">0</span></div><div id="tm2" class="tm2">Team 2 (orange): <span id="s2">0</span></div></div>
+<div id="turn"></div>
+<div class="grid" id="grid"></div>
+
+<script>
+var PAIRS=[
+["Wetter","Zustand der Atmosphäre an einem bestimmten Ort zu einem bestimmten Zeitpunkt"],
+["Klima","Durchschnittlicher Zustand der Atmosphäre an einem bestimmten Ort über 30 Jahre"],
+["Albedo","Verhältnis der reflektierten Strahlung zur gesamten Strahlung"],
+["Globalstrahlung","Teil der solaren Strahlung, der die Erdoberfläche erreicht"],
+["Geozone","Naturraum mit annähernd einheitlichen klimatischen und naturräumlichen Erscheinungen"],
+["Klimafaktor","Lage zum Meer"],
+["Wetterelement","Lufttemperatur"],
+["Humid","feucht"],
+["Arid","trocken"],
+["Jahreszeitenklima","Klima, bei dem die Temperaturschwankungen über das Jahr größer sind als am Tag"],
+["Tageszeitenklima","Klima, bei dem die Temperaturschwankungen am Tag größer sind als über das Jahr"],
+["Globale Auswirkungen des Klimawandels","Hitze, Wasserknappheit, Meeresspiegelanstieg, Tropische Wirbelstürme"],
+["Kipppunkt","Schwellenwert, ab dem Teilsysteme des Weltklimas irreversible Veränderungen erfahren"],
+["RCP","Representative Concentration Pathway"],
+["Mitigation","Klimaschutz, der die Ursachen des Klimawandels bekämpft"],
+["Adaptation","Klimaanpassung, bereitet den Umgang mit den Folgen des Klimawandels vor"]
+];
+var TIME=480,N=PAIRS.length,timer,left,moves,first,second,busy,matched,running=false,cur=1,score=[0,0,0];
+var grid=document.getElementById('grid');
+function $(i){return document.getElementById(i)}
+function esc(s){return s.replace(/&/g,'&amp;').replace(/</g,'&lt;')}
+function shuffle(a){for(var i=a.length-1;i>0;i--){var j=Math.floor(Math.random()*(i+1)),t=a[i];a[i]=a[j];a[j]=t}return a}
+function ui(){
+  $('s1').textContent=score[1];$('s2').textContent=score[2];
+  $('tm1').classList.toggle('active',running&&cur===1);$('tm2').classList.toggle('active',running&&cur===2);
+  $('turn').textContent=running?('Team '+cur+(cur===1?' (blau)':' (orange)')+' ist dran'):'';
+}
+function result(){
+  if(score[1]===score[2])return 'Unentschieden: '+score[1]+' zu '+score[2]+' Paaren';
+  var w=score[1]>score[2]?1:2;
+  return 'Team '+w+' gewinnt mit '+Math.max(score[1],score[2])+' zu '+Math.min(score[1],score[2])+' Paaren';
+}
+function build(){
+  var cards=[];
+  PAIRS.forEach(function(p,i){
+    cards.push({i:i,t:'begriff',tag:'Begriff',txt:p[0]});
+    cards.push({i:i,t:'def',tag:'Definition',txt:p[1]});
+  });
+  shuffle(cards);grid.innerHTML='';
+  cards.forEach(function(c){
+    var el=document.createElement('div');el.className='card';el.dataset.id=c.i;el.dataset.t=c.t;
+    el.innerHTML='<div class="face back">🌍</div><div class="face front '+c.t+'"><span class="tag">'+c.tag+'</span><span class="txt">'+esc(c.txt)+'</span></div>';
+    el.addEventListener('click',function(){flip(el)});
+    grid.appendChild(el);
+  });
+}
+function start(){
+  clearInterval(timer);
+  document.querySelectorAll('.overlay').forEach(function(o){o.classList.remove('visible')});
+  left=TIME;moves=0;first=second=null;busy=false;matched=0;running=true;cur=1;score=[0,0,0];
+  $('time').textContent=left;$('flips').textContent=0;
+  build();ui();
+  timer=setInterval(function(){
+    left--;$('time').textContent=left;
+    if(left<=0){clearInterval(timer);running=false;ui();$('overInfo').textContent=result()+' \u2013 Zum Neustart klicken';$('over').classList.add('visible')}
+  },1000);
+}
+function flip(el){
+  if(!running||busy||el.classList.contains('flipped')||el.classList.contains('matched'))return;
+  el.classList.add('flipped');
+  if(!first){first=el;return}
+  second=el;moves++;$('flips').textContent=moves;busy=true;
+  var ok=first.dataset.id===second.dataset.id&&first.dataset.t!==second.dataset.t;
+  if(ok){
+    first.classList.add('matched','t'+cur);second.classList.add('matched','t'+cur);
+    first=second=null;busy=false;matched++;score[cur]++;ui();
+    if(matched===N){
+      clearInterval(timer);running=false;ui();
+      $('winInfo').textContent=result()+' \u2013 Zum Neustart klicken';
+      setTimeout(function(){$('win').classList.add('visible')},700);
+    }
+  }else{
+    setTimeout(function(){first.classList.remove('flipped');second.classList.remove('flipped');first=second=null;busy=false;cur=3-cur;ui()},1800);
+  }
+}
+document.querySelectorAll('.overlay').forEach(function(o){o.addEventListener('click',start)});
+build();
+</script>
+</body>
+</html>
