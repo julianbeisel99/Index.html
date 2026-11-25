@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Memory: Länder und Hauptstädte Europas</title>
+<style>
+:root{--bg:#e9f1f7;--ink:#26323d;--bar:#fff;--land:#fff6dd;--stadt:#e3f4ea;
+box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#171e26;--ink:#eef2f6;--bar:#26303b;--land:#4b4530;--stadt:#2e4a3b}}
+html,body{margin:0}
+body{background:radial-gradient(circle at 20% 0%,rgba(80,150,220,.25),transparent 55%),var(--bg);color:var(--ink);font-family:"Trebuchet MS",system-ui,sans-serif;text-align:center;padding:12px}
+h1{font-size:1.5rem;margin:6px 0}
+.lv{display:flex;gap:8px;justify-content:center;margin:6px 0}
+.lv button{font:inherit;border:2px solid #2f6db0;background:var(--bar);color:var(--ink);border-radius:20px;padding:6px 16px;cursor:pointer}
+.lv button.on{background:#2f6db0;color:#fff;font-weight:700}
+.info{display:flex;gap:10px;justify-content:center;margin:8px 0;flex-wrap:wrap}
+.info div{background:var(--bar);border-radius:10px;padding:6px 14px;box-shadow:0 1px 4px rgba(0,0,0,.15)}
+.tm1{border-left:10px solid #1f78d1}.tm2{border-left:10px solid #e07b18}
+.info .active{outline:3px solid var(--ink);font-weight:700}
+#turn{font-size:1.1rem;font-weight:700;margin-bottom:8px;min-height:1.4em}
+.grid{display:grid;grid-template-columns:repeat(8,1fr);gap:10px;max-width:1150px;margin:0 auto}
+@media (max-width:900px){.grid{grid-template-columns:repeat(4,1fr);gap:7px}}
+.card{position:relative;aspect-ratio:3/4;cursor:pointer;perspective:800px}
+.face{position:absolute;inset:0;border-radius:14px;backface-visibility:hidden;transition:transform .5s;box-sizing:border-box;box-shadow:0 4px 10px rgba(0,0,0,.28)}
+.back{background:repeating-linear-gradient(45deg,rgba(255,255,255,.1) 0 8px,transparent 8px 16px),linear-gradient(135deg,#2f6db0,#1b3f73);border:3px solid #fff;display:flex;align-items:center;justify-content:center;font-size:2.4rem}
+.front{transform:rotateY(180deg);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:5px;padding:6px;border:3px solid #fff}
+.front.land{background:linear-gradient(160deg,var(--land),#fff0b8)}
+.front.stadt{background:linear-gradient(160deg,var(--stadt),#c9ecd7)}
+.card.flipped .back,.card.matched .back{transform:rotateY(-180deg)}
+.card.flipped .front,.card.matched .front{transform:rotateY(0)}
+.card.t1 .front{background:#bfe0ff!important;border-color:#1f78d1}
+.card.t2 .front{background:#ffd3b0!important;border-color:#e07b18}
+.card.matched{animation:pop .4s}
+@keyframes pop{50%{transform:scale(1.07)}}
+.flag{width:86%;height:auto;aspect-ratio:3/2;border-radius:4px;box-shadow:0 1px 4px rgba(0,0,0,.45);display:block}
+.tag{font-size:.58rem;text-transform:uppercase;letter-spacing:.07em;color:#444;background:rgba(255,255,255,.7);border-radius:8px;padding:1px 7px}
+.name{font-weight:700;font-size:clamp(.66rem,2.7vw,1rem);line-height:1.15;overflow-wrap:anywhere;hyphens:auto;color:#222}
+.overlay{position:fixed;inset:0;background:rgba(0,0,0,.8);color:#fff;display:none;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:20px;font-size:2.2rem;font-weight:700;z-index:10;cursor:pointer}
+.overlay.visible{display:flex}
+.overlay small{font-size:1.05rem;font-weight:400;margin-top:12px}
+</style>
+</head>
+<body>
+<h1>🌍 Memory: Länder und Hauptstädte</h1>
+<div class="lv"><button id="b0" class="on">Einfach</button><button id="b1">Schwer</button></div>
+<div id="start" class="overlay visible">Zum Starten klicken<small>Finde Land und Hauptstadt – mit der gleichen Flagge!</small></div>
+<div id="over" class="overlay">ZEIT ABGELAUFEN !<small id="overInfo"></small></div>
+<div id="win" class="overlay">GEWONNEN !<small id="winInfo"></small></div>
+<div class="info"><div>Zeit übrig: <span id="time">480</span></div><div>Züge: <span id="flips">0</span></div><div id="tm1" class="tm1">Team 1 (blau): <span id="s1">0</span></div><div id="tm2" class="tm2">Team 2 (orange): <span id="s2">0</span></div></div>
+<div id="turn"></div>
+<div class="grid" id="grid"></div>
+
+<script>
+var W="#fff",K="#000";
+function hs(c){return c.map(function(x,i){return '<rect y="'+(i*20/c.length)+'" width="30" height="'+(20/c.length+.05)+'" fill="'+x+'"/>'}).join('')}
+function vs(c){return c.map(function(x,i){return '<rect x="'+(i*30/c.length)+'" width="'+(30/c.length+.05)+'" height="20" fill="'+x+'"/>'}).join('')}
+function r(x,y,w,h,f){return '<rect x="'+x+'" y="'+y+'" width="'+w+'" height="'+h+'" fill="'+f+'"/>'}
+function cross(f,c,x,w){return r(0,0,30,20,f)+r(x,0,w,20,c)+r(0,10-w/2,30,w,c)}
+function nord(f,c,i){return r(0,0,30,20,f)+r(7,0,6,20,c)+r(0,7,30,6,c)+(i?r(8.5,0,3,20,i)+r(0,8.5,30,3,i):'')}
+var star='<polygon fill="#fff" points="17,7.6 17.9,9.6 20,9.8 18.4,11.2 18.9,13.3 17,12.2 15.1,13.3 15.6,11.2 14,9.8 16.1,9.6"/>';
+var FL={
+DE:hs([K,"#d00","#fc0"]),
+DK:r(0,0,30,20,"#c8102e")+r(9,0,3,20,W)+r(0,8.5,30,3,W),
+PL:hs([W,"#dc143c"]),
+CZ:hs([W,"#d7141a"])+'<polygon points="0,0 15,10 0,20" fill="#11457e"/>',
+AT:hs(["#ed2939",W,"#ed2939"]),
+CH:r(0,0,30,20,"#d52b1e")+r(13,3,4,14,W)+r(8,8,14,4,W),
+FR:vs(["#0055a4",W,"#ef4135"]),
+LU:hs(["#ed2939",W,"#00a1de"]),
+BE:vs([K,"#fae042","#ed2939"]),
+NL:hs(["#ae1c28",W,"#21468b"]),
+IT:vs(["#009246",W,"#ce2b37"]),
+ES:r(0,0,30,20,"#aa151b")+r(0,5,30,10,"#f1bf00"),
+GR:hs(["#0d5eaf",W,"#0d5eaf",W,"#0d5eaf",W,"#0d5eaf",W,"#0d5eaf"])+r(0,0,11,11,"#0d5eaf")+r(4.5,0,2,11,W)+r(0,4.5,11,2,W),
+PT:r(0,0,12,20,"#006600")+r(12,0,18,20,"#ff0000")+'<circle cx="12" cy="10" r="3.6" fill="#ffd700"/><circle cx="12" cy="10" r="2" fill="#c00"/>',
+TR:r(0,0,30,20,"#e30a17")+'<circle cx="11" cy="10" r="5" fill="#fff"/><circle cx="12.3" cy="10" r="4" fill="#e30a17"/>'+star,
+SE:r(0,0,30,20,"#006aa7")+r(8,0,4,20,"#fecc00")+r(0,8,30,4,"#fecc00"),
+HR:hs(["#ff0000",W,"#171796"])+'<rect x="12.5" y="6.5" width="5" height="6" fill="#fff" stroke="#c00" stroke-width=".4"/>'+r(12.5,6.5,1.7,1.5,"#f00")+r(15.8,6.5,1.7,1.5,"#f00")+r(14.2,8,1.7,1.5,"#f00")+r(12.5,9.5,1.7,1.5,"#f00")+r(15.8,9.5,1.7,1.5,"#f00"),
+MD:vs(["#0046ae","#ffd200","#cc092f"]),
+FI:r(0,0,30,20,W)+r(8,0,4,20,"#003580")+r(0,8,30,4,"#003580"),
+LV:r(0,0,30,20,"#9e3039")+r(0,8,30,4,W),
+LT:hs(["#fdb913","#006a44","#c1272d"]),
+EE:hs(["#0072ce",K,W]),
+NO:nord("#ba0c2f",W,"#00205b"),
+HU:hs(["#cd2a3e",W,"#436f4d"]),
+RO:vs(["#002b7f","#fcd116","#ce1126"]),
+BG:hs([W,"#00966e","#d62612"]),
+IE:vs(["#169b62",W,"#ff883e"]),
+UA:hs(["#0057b7","#ffd700"]),
+IS:nord("#02529c",W,"#dc1e35"),
+GB:r(0,0,30,20,"#012169")+'<path d="M0,0L30,20M30,0L0,20" stroke="#fff" stroke-width="3.6"/><path d="M0,0L30,20M30,0L0,20" stroke="#c8102e" stroke-width="1.2"/><path d="M15,0V20M0,10H30" stroke="#fff" stroke-width="6"/><path d="M15,0V20M0,10H30" stroke="#c8102e" stroke-width="3.6"/>',
+MK:r(0,0,30,20,"#d20000")+'<path d="M15,10L0,0M15,10L30,0M15,10L0,20M15,10L30,20M15,10V0M15,10V20M15,10H0M15,10H30" stroke="#ffe600" stroke-width="1.6"/><circle cx="15" cy="10" r="3.4" fill="#ffe600" stroke="#d20000" stroke-width=".8"/>',
+MT:r(0,0,15,20,W)+r(15,0,15,20,"#cf142b")+r(2,1.5,1,4,"#999")+r(.5,3,4,1,"#999")
+};
+var LEVELS=[
+[["DE","Deutschland","Berlin"],["DK","Dänemark","Kopenhagen"],["PL","Polen","Warschau"],["CZ","Tschechien","Prag"],["AT","Österreich","Wien"],["CH","Schweiz","Bern"],["FR","Frankreich","Paris"],["LU","Luxemburg","Luxemburg"],["BE","Belgien","Brüssel"],["NL","Niederlande","Amsterdam"],["IT","Italien","Rom"],["ES","Spanien","Madrid"],["GR","Griechenland","Athen"],["PT","Portugal","Lissabon"],["TR","Türkei","Ankara"],["SE","Schweden","Stockholm"]],
+[["HR","Kroatien","Zagreb"],["MD","Moldawien","Chișinău"],["FI","Finnland","Helsinki"],["LV","Lettland","Riga"],["LT","Litauen","Vilnius"],["EE","Estland","Tallinn"],["NO","Norwegen","Oslo"],["HU","Ungarn","Budapest"],["RO","Rumänien","Bukarest"],["BG","Bulgarien","Sofia"],["IE","Irland","Dublin"],["UA","Ukraine","Kiew"],["IS","Island","Reykjavik"],["GB","Vereinigtes Königreich","London"],["MK","Nordmazedonien","Skopje"],["MT","Malta","Valletta"]]
+];
+var lvl=0,TIME=480,timer,left,moves,first,second,busy,matched,running=false,cur=1,score=[0,0,0],N=16;
+var grid=document.getElementById('grid');
+function $(i){return document.getElementById(i)}
+function flag(code,name){return '<svg class="flag" viewBox="0 0 30 20" role="img" aria-label="Flagge '+name+'">'+FL[code]+'</svg>'}
+function shuffle(a){for(var i=a.length-1;i>0;i--){var j=Math.floor(Math.random()*(i+1)),t=a[i];a[i]=a[j];a[j]=t}return a}
+function ui(){
+  $('s1').textContent=score[1];$('s2').textContent=score[2];
+  $('tm1').classList.toggle('active',running&&cur===1);$('tm2').classList.toggle('active',running&&cur===2);
+  $('turn').textContent=running?('Team '+cur+(cur===1?' (blau)':' (orange)')+' ist dran'):'';
+}
+function result(){
+  if(score[1]===score[2])return 'Unentschieden: '+score[1]+' zu '+score[2]+' Paaren';
+  var w=score[1]>score[2]?1:2;
+  return 'Team '+w+' gewinnt mit '+Math.max(score[1],score[2])+' zu '+Math.min(score[1],score[2])+' Paaren';
+}
+function build(){
+  var cards=[];
+  LEVELS[lvl].forEach(function(c,i){
+    cards.push({i:i,t:'land',tag:'Land',txt:c[1]});
+    cards.push({i:i,t:'stadt',tag:'Hauptstadt',txt:c[2]});
+  });
+  shuffle(cards);grid.innerHTML='';
+  cards.forEach(function(c){
+    var el=document.createElement('div');el.className='card';el.dataset.id=c.i;el.dataset.t=c.t;
+    var L=LEVELS[lvl][c.i];
+    el.innerHTML='<div class="face back">🌍</div><div class="face front '+c.t+'">'+flag(L[0],L[1])+'<span class="tag">'+c.tag+'</span><span class="name">'+c.txt+'</span></div>';
+    el.addEventListener('click',function(){flip(el)});
+    grid.appendChild(el);
+  });
+}
+function start(){
+  clearInterval(timer);
+  document.querySelectorAll('.overlay').forEach(function(o){o.classList.remove('visible')});
+  left=TIME;moves=0;first=second=null;busy=false;matched=0;running=true;cur=1;score=[0,0,0];
+  $('time').textContent=left;$('flips').textContent=0;
+  build();ui();
+  timer=setInterval(function(){
+    left--;$('time').textContent=left;
+    if(left<=0){clearInterval(timer);running=false;ui();$('overInfo').textContent=result()+' \u2013 Zum Neustart klicken';$('over').classList.add('visible')}
+  },1000);
+}
+function flip(el){
+  if(!running||busy||el.classList.contains('flipped')||el.classList.contains('matched'))return;
+  el.classList.add('flipped');
+  if(!first){first=el;return}
+  second=el;moves++;$('flips').textContent=moves;busy=true;
+  var ok=first.dataset.id===second.dataset.id&&first.dataset.t!==second.dataset.t;
+  if(ok){
+    first.classList.add('matched','t'+cur);second.classList.add('matched','t'+cur);
+    first=second=null;busy=false;matched++;score[cur]++;ui();
+    if(matched===N){
+      clearInterval(timer);running=false;ui();
+      $('winInfo').textContent=result()+' \u2013 Zum Neustart klicken';
+      setTimeout(function(){$('win').classList.add('visible')},700);
+    }
+  }else{
+    setTimeout(function(){first.classList.remove('flipped');second.classList.remove('flipped');first=second=null;busy=false;cur=3-cur;ui()},1000);
+  }
+}
+function setLevel(n){lvl=n;$('b0').classList.toggle('on',n===0);$('b1').classList.toggle('on',n===1)}
+$('b0').addEventListener('click',function(){setLevel(0);start()});
+$('b1').addEventListener('click',function(){setLevel(1);start()});
+document.querySelectorAll('.overlay').forEach(function(o){o.addEventListener('click',start)});
+build();
+</script>
+</body>
+</html>
